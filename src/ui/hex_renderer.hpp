@@ -5,7 +5,7 @@
 
 namespace notestudio::ui {
 
-class HexRenderer final : public QQuickPaintedItem {
+class HexRenderer : public QQuickPaintedItem {
     Q_OBJECT
     Q_PROPERTY(bool hexMode READ hexMode WRITE setHexMode NOTIFY hexModeChanged)
     Q_PROPERTY(int beats READ beats WRITE setBeats NOTIFY notationChanged)
