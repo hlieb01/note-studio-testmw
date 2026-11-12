@@ -1,0 +1,75 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows · MSVC 2022
+    runs-on: windows-2022
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+  android:
+    name: Android · arm64-v8a
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Qt Android kit
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: 'linux'
+          target: 'android'
+          arch: 'android_arm64_v8a'
+          install-deps: true
+          cache: true
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build-android
+          -DCMAKE_TOOLCHAIN_FILE="$QT_ROOT_DIR/lib/cmake/Qt6/qt.toolchain.cmake"
+          -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+          -DANDROID_ABI=arm64-v8a
+          -DANDROID_PLATFORM=android-23
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-android --parallel
