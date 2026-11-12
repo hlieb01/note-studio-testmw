@@ -58,7 +58,8 @@ void PianoSynth::noteOn(std::uint8_t midiNote, float velocity) noexcept {
     const double frequency = 440.0 * std::pow(2.0, (static_cast<double>(midiNote) - 69.0) / 12.0);
     const std::uint32_t index = nextVoice_.fetch_add(1U, std::memory_order_relaxed) % static_cast<std::uint32_t>(MaxVoices);
     Voice& voice = voices_[index];
-    voice.generation.fetch_add(1U, std::memory_order_relaxed);
+    voice.gate.store(0.0F, std::memory_order_release);
+    voice.generation.store(0U, std::memory_order_relaxed);
     voice.frequency.store(static_cast<float>(frequency), std::memory_order_relaxed);
     voice.velocity.store(clampedVelocity, std::memory_order_relaxed);
     voice.releaseGain.store(1.0F, std::memory_order_relaxed);

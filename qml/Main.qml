@@ -5,78 +5,138 @@ import NoteStudio 1.0
 
 ApplicationWindow {
     id: window
-    width: 1100
-    height: 720
-    minimumWidth: 760
-    minimumHeight: 520
+    width: 1180
+    height: 780
+    minimumWidth: 800
+    minimumHeight: 620
     visible: true
     title: "Note Studio"
     color: "#061724"
+    property int selectedDuration: 4
+    property int selectedMidi: 60
+    readonly property var pitchValues: [60, 62, 64, 65, 67, 69, 71, 72]
 
-    property bool playing: false
+    header: ToolBar {
+        background: Rectangle { color: "#0b2332" }
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            Label { text: "Note Studio"; color: "#d9f7fa"; font.pixelSize: 24; font.bold: true }
+            Label { text: "· Piano score"; color: "#80a8b8"; font.pixelSize: 14 }
+            Item { Layout.fillWidth: true }
+            Label { text: "Meter"; color: "#9bbbc7" }
+            ComboBox {
+                id: meterBox
+                textRole: "label"
+                model: [
+                    { label: "4/4", beats: 4, unit: 4 },
+                    { label: "3/4", beats: 3, unit: 4 },
+                    { label: "6/8", beats: 6, unit: 8 },
+                    { label: "7/8", beats: 7, unit: 8 },
+                    { label: "4/8", beats: 4, unit: 8 }
+                ]
+                onActivated: function(index) {
+                    const signature = model[index]
+                    score.setTimeSignature(signature.beats, signature.unit)
+                }
+            }
+            Switch {
+                text: checked ? "Hex" : "Staff"
+                checked: score.hexMode
+                onToggled: score.hexMode = checked
+            }
+        }
+    }
 
-    RowLayout {
+    ColumnLayout {
         anchors.fill: parent
-        spacing: 0
+        anchors.margins: 18
+        spacing: 14
 
         Rectangle {
+            Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredWidth: 92
-            color: "#0b2332"
-            ColumnLayout {
+            radius: 16
+            color: "#081d2b"
+            border.color: "#173d50"
+            HexRenderer {
+                id: staff
                 anchors.fill: parent
-                anchors.margins: 14
-                spacing: 12
-                Label { text: "NOTE"; color: "#76eee5"; font.bold: true; font.pixelSize: 15 }
-                Repeater {
-                    model: ["♪", "♫", "♩", "𝄽", "♯"]
-                    delegate: Rectangle {
-                        required property string modelData
-                        Layout.preferredWidth: 60
-                        Layout.preferredHeight: 54
-                        radius: 12
-                        color: index === 0 ? "#164b5b" : "#102e3e"
-                        border.color: "#246276"
-                        Label { anchors.centerIn: parent; text: modelData; color: "#b8fff6"; font.pixelSize: 24 }
-                    }
-                }
-                Item { Layout.fillHeight: true }
-                Label { text: "4/4"; color: "#88aebd"; font.pixelSize: 13; Layout.alignment: Qt.AlignHCenter }
+                anchors.margins: 12
+                hexMode: score.hexMode
+                beats: score.beats
+                beatUnit: score.beatUnit
+                coda: score.coda
+                notes: score.noteData
             }
         }
 
-        ColumnLayout {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.margins: 22
-            spacing: 16
-
-            RowLayout {
-                Layout.fillWidth: true
-                Label { text: "Note Studio"; color: "#d9f7fa"; font.pixelSize: 26; font.bold: true }
-                Item { Layout.fillWidth: true }
-                Label { text: "Piano · 64 voices"; color: "#7299a9"; font.pixelSize: 13 }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                radius: 18
-                color: "#081d2b"
-                border.color: "#173d50"
-                HexRenderer { anchors.fill: parent; anchors.margins: 8 }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Button {
-                    text: window.playing ? "■  Stop" : "▶  Play"
-                    highlighted: true
-                    onClicked: window.playing = !window.playing
+            Layout.preferredHeight: 184
+            radius: 16
+            color: "#0b2332"
+            border.color: "#173d50"
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 10
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "PITCH"; color: "#75eee5"; font.bold: true; font.pixelSize: 11 }
+                    Repeater {
+                        model: ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
+                        delegate: Button {
+                            required property string modelData
+                            text: modelData
+                            checkable: true
+                            checked: window.selectedMidi === window.pitchValues[index]
+                            onClicked: window.selectedMidi = window.pitchValues[index]
+                        }
+                    }
+                    Item { Layout.fillWidth: true }
+                    Label { text: "DURATION"; color: "#75eee5"; font.bold: true; font.pixelSize: 11 }
+                    Repeater {
+                        model: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+                        delegate: Button {
+                            required property int modelData
+                            text: "1/" + modelData
+                            checkable: true
+                            checked: window.selectedDuration === modelData
+                            onClicked: window.selectedDuration = modelData
+                        }
+                    }
                 }
-                Label { text: window.playing ? "Playback preview" : "Ready"; color: "#86abb9"; leftPadding: 10 }
-                Item { Layout.fillWidth: true }
-                Label { text: "120 BPM"; color: "#a7c8d2" }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: "SYMBOLS"; color: "#75eee5"; font.bold: true; font.pixelSize: 11 }
+                    Button { text: "♪ Note"; onClicked: score.addNote(window.selectedMidi, window.selectedDuration) }
+                    Button { text: "♩ Chord"; onClicked: score.addChord(window.selectedMidi, window.selectedDuration) }
+                    Button { text: "𝄽 Rest"; onClicked: score.addRest(window.selectedDuration) }
+                    Button { text: "⌒ Fermata"; enabled: score.noteCount > 0; onClicked: score.addFermata() }
+                    Button { text: "Tie"; enabled: score.noteCount > 1; onClicked: score.tieLastTwo() }
+                    Button { text: "Slur"; enabled: score.noteCount > 1; onClicked: score.slurLastTwo() }
+                    Button { text: "Repeat"; onClicked: score.toggleRepeat() }
+                    Button { text: "𝄌 Coda"; onClicked: score.toggleCoda() }
+                    ComboBox {
+                        id: articulationBox
+                        model: ["None", "Staccato", "Accent", "Sforzando"]
+                        onActivated: score.setLastArticulation(["none", "staccato", "accent", "sforzando"][currentIndex])
+                    }
+                    Item { Layout.fillWidth: true }
+                    Button { text: "Clear"; onClicked: score.clearMeasure() }
+                    Button {
+                        text: score.playing ? "■  Stop" : "▶  Play"
+                        highlighted: true
+                        onClicked: score.togglePlayback()
+                    }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: score.message; color: "#9bbbc7"; Layout.fillWidth: true }
+                    Label { text: score.noteCount + " event(s) · " + score.beats + "/" + score.beatUnit; color: "#779aaa" }
+                }
             }
         }
     }

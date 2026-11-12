@@ -26,12 +26,19 @@ qt_add_executable(note-studio
     src/audio/piano_synth.cpp
     src/ui/hex_renderer.hpp
     src/ui/hex_renderer.cpp
+    src/ui/score_controller.hpp
+    src/ui/score_controller.cpp
 )
 
 qt_add_qml_module(note-studio
     URI NoteStudio
     VERSION 1.0
     QML_FILES qml/Main.qml
+)
+
+qt_add_resources(note-studio notation_fonts
+    PREFIX "/fonts"
+    FILES assets/Bravura.otf assets/OFL.txt
 )
 
 target_include_directories(note-studio PRIVATE

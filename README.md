@@ -1,6 +1,6 @@
 # Note Studio
 
-C++20 / Qt 6 Quick starter for Windows (MSVC) and Android (NDK). The core score model is Qt-independent; the piano engine synthesizes tones mathematically, and the custom `HexRenderer` draws the staff as concentric hexagons.
+C++20 / Qt 6 Quick notation editor for Windows (MSVC) and Android (NDK). The core score model is Qt-independent. `ScoreController` connects QML editing and playback to a 64-voice mathematical piano synthesizer. The default renderer draws a grand staff using the embedded Bravura SMuFL font; the concentric-hexagon view remains an optional visual mode.
 
 ## Requirements
 
@@ -20,4 +20,6 @@ For Android, configure with the Qt-provided Android toolchain and SDK/NDK settin
 
 ## Current starter scope
 
-The score types support pitches, dotted durations, notes/rests/chords and common meter metadata (including 4/4 and 6/8) plus repeat markers. `PianoSynth` exposes note-on/note-off and initializes a stereo float-output miniaudio device. The QML Play/Stop button currently toggles the UI preview state; connecting score playback scheduling and synthesizer control is the next integration step.
+The model supports notes, rests, chords, dotted durations through 1/512, arbitrary power-of-two beat units, fermatas, ties, slurs, articulations, repeat markers and coda metadata. The editor schedules the current measure at 120 BPM and sends note-on/note-off commands to miniaudio. The first chord control inserts a major triad. The renderer draws a treble/bass grand staff by default and has an optional hexagonal easter-egg mode.
+
+Bravura is the SMuFL reference font and is distributed under the SIL Open Font License; the license text is included at `assets/OFL.txt`.
