@@ -47,8 +47,6 @@ else()
     target_compile_options(note-studio PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
 endif()
 
-if(ANDROID)
-    set_property(TARGET note-studio PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
+if(NOT ANDROID)
+    install(TARGETS note-studio RUNTIME DESTINATION bin)
 endif()
-
-install(TARGETS note-studio RUNTIME DESTINATION bin)
