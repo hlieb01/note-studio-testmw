@@ -35,6 +35,14 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: note-studio-windows-x64
+          path: build/Release/note-studio.exe
+          if-no-files-found: error
+          retention-days: 14
+
   android:
     name: Android · arm64-v8a
     runs-on: ubuntu-24.04
@@ -80,3 +88,11 @@ jobs:
 
       - name: Build
         run: cmake --build build-android --parallel
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: note-studio-android-arm64
+          path: build-android/android-build/build/outputs/apk/release/android-build-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 14
