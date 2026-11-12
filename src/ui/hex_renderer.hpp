@@ -4,7 +4,7 @@
 
 namespace notestudio::ui {
 
-class HexRenderer final : public QQuickPaintedItem {
+class HexRenderer : public QQuickPaintedItem {
     Q_OBJECT
 public:
     explicit HexRenderer(QQuickItem* parent = nullptr);
