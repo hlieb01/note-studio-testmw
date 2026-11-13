@@ -102,7 +102,7 @@ void PianoSynth::render(float* output, std::uint32_t frameCount) noexcept {
             const std::uint32_t age = voice.generation.load(std::memory_order_relaxed);
             const double time = static_cast<double>(age) * inverseRate;
             const double envelope = organMode
-                ? std::min(1.0, time / 0.025)
+                ? (time < 0.025 ? time / 0.025 : 1.0)
                 : (time < static_cast<double>(AttackSeconds) ? time / static_cast<double>(AttackSeconds) : std::exp(-time / static_cast<double>(DecaySeconds)));
             float releaseGain = voice.releaseGain.load(std::memory_order_relaxed);
             if (gate <= 0.0F) {
