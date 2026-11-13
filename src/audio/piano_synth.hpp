@@ -22,6 +22,7 @@ public:
     void stop() noexcept;
     void noteOn(std::uint8_t midiNote, float velocity = 0.8F) noexcept;
     void noteOff(std::uint8_t midiNote) noexcept;
+    void setOrganMode(bool enabled) noexcept { organMode_.store(enabled, std::memory_order_relaxed); }
 
 private:
     struct Voice {
@@ -37,6 +38,7 @@ private:
 
     std::array<Voice, MaxVoices> voices_{};
     std::atomic<std::uint32_t> nextVoice_{0U};
+    std::atomic<bool> organMode_{false};
     ma_device* device_{nullptr};
     double sampleRate_{48000.0};
 };

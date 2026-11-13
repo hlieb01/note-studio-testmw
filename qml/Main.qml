@@ -99,6 +99,7 @@ ApplicationWindow {
                 dynamicMark: score.dynamicMark
                 dynamicWedge: score.dynamicWedge
                 notes: score.noteData
+                onNoteSelected: function(index) { score.setSelectedEvent(index) }
             }
         }
 
@@ -162,6 +163,19 @@ ApplicationWindow {
                     id: symbolTools
                     height: parent.height
                     Label { text: "SYMBOLS"; color: "#75eee5"; font.bold: true; font.pixelSize: 11 }
+                    ComboBox {
+                        id: instrumentBox
+                        model: ["Piano", "Organ"]
+                        currentIndex: score.organMode ? 1 : 0
+                        onActivated: score.setOrganMode(currentIndex === 1)
+                    }
+                    Button { text: "♭"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(-1) }
+                    Button { text: "♮"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(0) }
+                    Button { text: "♯"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(1) }
+                    Button { text: "𝄫"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(-2) }
+                    Button { text: "𝄪"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(2) }
+                    Button { text: "triple ♭"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(-3) }
+                    Button { text: "triple ♯"; enabled: score.selectedEvent >= 0; onClicked: score.setSelectedAccidental(3) }
                     Button { text: "♪ Note"; onClicked: score.addNote(window.selectedMidi, window.selectedDuration, window.selectedDots) }
                     Button { text: "♩ Chord"; onClicked: score.addChord(window.selectedMidi, window.selectedDuration, window.selectedDots) }
                     Button { text: "𝄽 Rest"; onClicked: score.addRest(window.selectedDuration, window.selectedDots) }

@@ -89,6 +89,7 @@ void PianoSynth::dataCallback(ma_device* device, void* output, const void*, std:
 
 void PianoSynth::render(float* output, std::uint32_t frameCount) noexcept {
     const double inverseRate = 1.0 / sampleRate_;
+    const bool organMode = organMode_.load(std::memory_order_relaxed);
     for (std::uint32_t frame = 0U; frame < frameCount; ++frame) {
         float sample = 0.0F;
         for (Voice& voice : voices_) {
@@ -100,9 +101,9 @@ void PianoSynth::render(float* output, std::uint32_t frameCount) noexcept {
             float amplitude = voice.velocity.load(std::memory_order_relaxed);
             const std::uint32_t age = voice.generation.load(std::memory_order_relaxed);
             const double time = static_cast<double>(age) * inverseRate;
-            const double envelope = time < static_cast<double>(AttackSeconds)
-                ? time / static_cast<double>(AttackSeconds)
-                : std::exp(-time / static_cast<double>(DecaySeconds));
+            const double envelope = organMode
+                ? std::min(1.0, time / 0.025)
+                : (time < static_cast<double>(AttackSeconds) ? time / static_cast<double>(AttackSeconds) : std::exp(-time / static_cast<double>(DecaySeconds)));
             float releaseGain = voice.releaseGain.load(std::memory_order_relaxed);
             if (gate <= 0.0F) {
                 releaseGain *= static_cast<float>(std::exp(-inverseRate / static_cast<double>(ReleaseSeconds)));
@@ -114,10 +115,13 @@ void PianoSynth::render(float* output, std::uint32_t frameCount) noexcept {
             }
             amplitude *= static_cast<float>(envelope) * releaseGain;
             const double baseFrequency = static_cast<double>(frequency);
-            for (std::size_t harmonic = 1U; harmonic <= HarmonicCount; ++harmonic) {
+            const std::size_t harmonicCount = organMode ? 8U : HarmonicCount;
+            for (std::size_t harmonic = 1U; harmonic <= harmonicCount; ++harmonic) {
                 const double partial = static_cast<double>(harmonic);
                 const double inharmonicPartial = partial * std::sqrt(1.0 + static_cast<double>(Inharmonicity) * partial * partial);
-                const float weight = 1.0F / static_cast<float>(harmonic);
+                const float weight = organMode
+                    ? (harmonic == 1U ? 1.0F : harmonic == 2U ? 0.55F : harmonic == 3U ? 0.38F : harmonic == 4U ? 0.25F : harmonic == 6U ? 0.16F : 0.10F)
+                    : 1.0F / static_cast<float>(harmonic);
                 const double phase = std::fmod(static_cast<double>(age) * inverseRate * baseFrequency * inharmonicPartial * static_cast<double>(TwoPi), 2.0 * Pi);
                 const float hammer = 1.0F + 0.22F * static_cast<float>(harmonic == 1U ? 1.0 : std::exp(-partial / 3.0));
                 sample += amplitude * weight * hammer * static_cast<float>(std::sin(phase));

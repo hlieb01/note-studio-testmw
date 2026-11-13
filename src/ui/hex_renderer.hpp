@@ -2,6 +2,7 @@
 
 #include <QQuickPaintedItem>
 #include <QVariantList>
+#include <QMouseEvent>
 
 namespace notestudio::ui {
 
@@ -40,11 +41,14 @@ public:
     void setDynamicWedge(int value);
     void setNotes(const QVariantList& value);
     void paint(QPainter* painter) override;
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
 
 signals:
     void hexModeChanged();
     void notationModeChanged();
     void notationChanged();
+    void noteSelected(int index);
 
 private:
     void paintStaff(QPainter* painter);

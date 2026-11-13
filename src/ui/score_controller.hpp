@@ -26,6 +26,8 @@ class ScoreController final : public QObject {
     Q_PROPERTY(QString tempoName READ tempoName NOTIFY tempoChanged)
     Q_PROPERTY(int dynamicMark READ dynamicMark NOTIFY scoreChanged)
     Q_PROPERTY(int dynamicWedge READ dynamicWedge NOTIFY scoreChanged)
+    Q_PROPERTY(int selectedEvent READ selectedEvent NOTIFY selectionChanged)
+    Q_PROPERTY(bool organMode READ organMode NOTIFY instrumentChanged)
     Q_PROPERTY(QString message READ message NOTIFY messageChanged)
     Q_PROPERTY(QVariantList noteData READ noteData NOTIFY scoreChanged)
 public:
@@ -42,6 +44,8 @@ public:
     [[nodiscard]] QString tempoName() const;
     [[nodiscard]] int dynamicMark() const noexcept { return static_cast<int>(measure_.dynamic); }
     [[nodiscard]] int dynamicWedge() const noexcept { return static_cast<int>(measure_.wedge); }
+    [[nodiscard]] int selectedEvent() const noexcept { return selectedEvent_; }
+    [[nodiscard]] bool organMode() const noexcept { return organMode_; }
     [[nodiscard]] QString message() const { return message_; }
     [[nodiscard]] QVariantList noteData() const;
 
@@ -62,6 +66,9 @@ public:
     Q_INVOKABLE void toggleSegno();
     Q_INVOKABLE void setTempoBpm(int bpm);
     Q_INVOKABLE void setDynamics(int mark, int wedge);
+    Q_INVOKABLE void setSelectedEvent(int index);
+    Q_INVOKABLE void setSelectedAccidental(int accidental);
+    Q_INVOKABLE void setOrganMode(bool enabled);
     Q_INVOKABLE void setLastArticulation(const QString& name);
     Q_INVOKABLE void saveProjectJson(const QString& path);
     Q_INVOKABLE void loadProjectJson(const QString& path);
@@ -79,6 +86,8 @@ signals:
     void meterChanged();
     void messageChanged();
     void tempoChanged();
+    void selectionChanged();
+    void instrumentChanged();
 
 private slots:
     void playNextEvent();
@@ -94,6 +103,8 @@ private:
     std::size_t playbackIndex_{0};
     std::uint8_t repeatPass_{1U};
     bool playing_{false};
+    bool organMode_{false};
+    int selectedEvent_{-1};
     bool hexMode_{false};
     int notationMode_{0};
     double bpm_{120.0};

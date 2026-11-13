@@ -20,7 +20,7 @@ For Android, configure with the Qt-provided Android toolchain and SDK/NDK settin
 
 ## Editor capabilities
 
-The editor supports durations from whole notes through 1/1024 with up to three dots; notes, triads, rests, ties, slurs, articulations, fermata variants, repeats, coda/segno markers, tempo, dynamic marks, crescendo/diminuendo, and niente wedges. Playback uses the 64-voice miniaudio piano synthesizer. Render modes include the grand staff, a pitch/octave honeycomb, Jianpu digits, and Japanese kanji. Bravura and a subsetted Noto Sans CJK JP font are bundled with their license notices.
+The editor supports durations from whole notes through 1/1024 with up to three dots; notes, triads, rests, ties, slurs, articulations, fermata variants, repeats, coda/segno markers, tempo, dynamic marks, crescendo/diminuendo, and niente wedges. Playback uses a 64-voice miniaudio synthesizer with selectable piano (hammer attack and decay) and sustained additive organ timbres. Click an event in the notation to select it, then apply a flat, natural, sharp, double, or triple accidental to that note (or the first tone of a chord). Render modes include the grand staff, a pitch/octave honeycomb, Jianpu digits, and Japanese kanji. Bravura and a subsetted Noto Sans CJK JP font are bundled with their license notices.
 
 The File menu supports versioned JSON project save/load, MusicXML import/export, and Standard MIDI File export. The current editor owns one measure, so file import/export is intentionally bounded to a single part and measure; it does not claim full multi-part or multi-measure score editing. MusicXML constructs outside the editor model may be simplified or rejected.
 

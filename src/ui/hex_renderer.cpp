@@ -33,6 +33,16 @@ QChar glyph(ushort codepoint) { return QChar(codepoint); }
 HexRenderer::HexRenderer(QQuickItem* parent) : QQuickPaintedItem(parent) {
     setAntialiasing(true);
     setOpaquePainting(true);
+    setAcceptedMouseButtons(Qt::LeftButton);
+}
+
+void HexRenderer::mousePressEvent(QMouseEvent* event) {
+    if (event == nullptr || notes_.isEmpty()) return;
+    const qreal normalized = std::clamp(event->position().x() / std::max<qreal>(1.0, width()), 0.0, 0.999999);
+    const int noteCount = static_cast<int>(notes_.size());
+    const int index = std::clamp(static_cast<int>(normalized * static_cast<qreal>(noteCount)), 0, noteCount - 1);
+    emit noteSelected(index);
+    event->accept();
 }
 
 void HexRenderer::setHexMode(bool enabled) {
@@ -218,6 +228,7 @@ void HexRenderer::paintStaff(QPainter* painter) {
         const int accidental = note.value(QStringLiteral("accidental"), 0).toInt();
         const int dots = note.value(QStringLiteral("dots"), 0).toInt();
         const int articulation = note.value(QStringLiteral("articulation"), 0).toInt();
+        const bool selected = note.value(QStringLiteral("selected")).toBool();
         const ushort noteGlyph = denominator <= 1 ? SmuflNoteheadWhole : denominator <= 2 ? SmuflNoteheadHalf : SmuflNoteheadBlack;
         const ushort restGlyph = denominator <= 1 ? SmuflRestWhole : denominator <= 2 ? SmuflRestHalf : denominator <= 4 ? SmuflRestQuarter : SmuflRest8th;
         const bool bassRegister = midi < 48;
@@ -234,6 +245,13 @@ void HexRenderer::paintStaff(QPainter* painter) {
             }
         }
         painter->setPen(ink);
+        if (selected) {
+            painter->setPen(QPen(QColor(QStringLiteral("#ffcc66")), 2.0));
+            painter->setBrush(QColor(255, 204, 102, 45));
+            painter->drawEllipse(QPointF(x, baseline), staffSpace * 1.05, staffSpace * 0.8);
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(ink);
+        }
         if (!isRest && accidental != 0) {
             const ushort accidentalGlyph = accidental == -1 ? 0xE260U : accidental == 1 ? 0xE262U :
                 accidental == -2 ? 0xE264U : accidental == 2 ? 0xE263U : accidental < 0 ? 0xE264U : 0xE263U;

@@ -32,6 +32,7 @@ QVariantList ScoreController::noteData() const {
     QVariantList result;
     for (const auto& event : measure_.events) {
         QVariantMap item;
+        item.insert(QStringLiteral("selected"), static_cast<int>(result.size()) == selectedEvent_);
         std::visit([&item](const auto& value) {
             using T = std::decay_t<decltype(value)>;
             item.insert(QStringLiteral("denominator"), static_cast<int>(value.duration.denominator));
@@ -254,6 +255,7 @@ void ScoreController::addRest(int denominator, int dots) {
 void ScoreController::clearMeasure() {
     stopPlayback();
     measure_.events.clear();
+    if (selectedEvent_ != -1) { selectedEvent_ = -1; emit selectionChanged(); }
     emit scoreChanged();
     setMessage(QStringLiteral("Measure cleared"));
 }
@@ -356,6 +358,34 @@ void ScoreController::setDynamics(int mark, int wedge) {
     setMessage(QStringLiteral("Dynamics updated"));
 }
 
+void ScoreController::setSelectedEvent(int index) {
+    const int bounded = index >= 0 && static_cast<std::size_t>(index) < measure_.events.size() ? index : -1;
+    if (selectedEvent_ == bounded) return;
+    selectedEvent_ = bounded;
+    emit selectionChanged();
+    emit scoreChanged();
+}
+
+void ScoreController::setSelectedAccidental(int accidental) {
+    if (selectedEvent_ < 0 || static_cast<std::size_t>(selectedEvent_) >= measure_.events.size() || accidental < -3 || accidental > 3) return;
+    auto& event = measure_.events[static_cast<std::size_t>(selectedEvent_)];
+    bool changed = false;
+    if (auto* note = std::get_if<core::Note>(&event)) { note->pitch.accidental = static_cast<core::Accidental>(accidental); changed = true; }
+    else if (auto* chord = std::get_if<core::Chord>(&event); chord != nullptr && !chord->pitches.empty()) {
+        chord->pitches.front().accidental = static_cast<core::Accidental>(accidental); changed = true;
+    }
+    if (changed) { emit scoreChanged(); setMessage(QStringLiteral("Accidental applied to selected event")); }
+    else setMessage(QStringLiteral("Select a pitched note or chord first"));
+}
+
+void ScoreController::setOrganMode(bool enabled) {
+    if (organMode_ == enabled) return;
+    organMode_ = enabled;
+    synth_.setOrganMode(enabled);
+    emit instrumentChanged();
+    setMessage(enabled ? QStringLiteral("Organ · sustained tone") : QStringLiteral("Piano · hammer tone"));
+}
+
 void ScoreController::setLastArticulation(const QString& name) {
     if (measure_.events.empty()) return;
     core::Articulation articulation = core::Articulation::None;
@@ -382,6 +412,8 @@ void ScoreController::loadProjectJson(const QString& path) {
     if (!core::ScoreIO::loadJson(loaded, path, &error)) { setMessage(QStringLiteral("Open failed: %1").arg(error)); return; }
     stopPlayback();
     measure_ = std::move(loaded);
+    selectedEvent_ = -1;
+    emit selectionChanged();
     bpm_ = static_cast<double>(measure_.tempoBpm);
     emit meterChanged();
     emit scoreChanged();
@@ -401,6 +433,8 @@ void ScoreController::importMusicXml(const QString& path) {
     if (!core::ScoreIO::importMusicXml(loaded, path, &error)) { setMessage(QStringLiteral("MusicXML import failed: %1").arg(error)); return; }
     stopPlayback();
     measure_ = std::move(loaded);
+    selectedEvent_ = -1;
+    emit selectionChanged();
     bpm_ = static_cast<double>(measure_.tempoBpm);
     emit meterChanged();
     emit scoreChanged();
