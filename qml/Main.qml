@@ -127,8 +127,13 @@ ApplicationWindow {
                     Item { Layout.fillWidth: true }
                     Button { text: "Clear"; onClicked: score.clearMeasure() }
                     Button {
+                        id: playbackButton
                         text: score.playing ? "■  Stop" : "▶  Play"
                         highlighted: true
+                        implicitWidth: 150
+                        implicitHeight: 58
+                        font.pixelSize: 20
+                        font.bold: true
                         onClicked: score.togglePlayback()
                     }
                 }

@@ -34,7 +34,11 @@ bool PianoSynth::start() noexcept {
     config.sampleRate = static_cast<ma_uint32>(sampleRate_);
     config.dataCallback = &PianoSynth::dataCallback;
     config.pUserData = this;
-    if (ma_device_init(nullptr, &config, device) != MA_SUCCESS || ma_device_start(device) != MA_SUCCESS) {
+    if (ma_device_init(nullptr, &config, device) != MA_SUCCESS) {
+        delete device;
+        return false;
+    }
+    if (ma_device_start(device) != MA_SUCCESS) {
         ma_device_uninit(device);
         delete device;
         return false;

@@ -12,6 +12,7 @@ int main(int argc, char* argv[]) {
     qmlRegisterType<notestudio::ui::HexRenderer>("NoteStudio", 1, 0, "HexRenderer");
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/assets/Bravura.otf"));
     notestudio::ui::ScoreController score;
+    score.initializeAudio();
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("score"), &score);
     const QUrl mainUrl(QStringLiteral("qrc:/qt/qml/NoteStudio/qml/Main.qml"));

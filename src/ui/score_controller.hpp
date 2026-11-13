@@ -33,6 +33,7 @@ public:
     [[nodiscard]] QString message() const { return message_; }
     [[nodiscard]] QVariantList noteData() const;
 
+    bool initializeAudio();
     Q_INVOKABLE void togglePlayback();
     Q_INVOKABLE void startPlayback();
     Q_INVOKABLE void stopPlayback();

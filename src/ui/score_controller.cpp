@@ -47,6 +47,15 @@ QVariantList ScoreController::noteData() const {
     return result;
 }
 
+bool ScoreController::initializeAudio() {
+    if (!synth_.start()) {
+        setMessage(QStringLiteral("Audio device unavailable; playback will retry when requested"));
+        return false;
+    }
+    setMessage(QStringLiteral("Audio ready"));
+    return true;
+}
+
 void ScoreController::togglePlayback() {
     playing_ ? stopPlayback() : startPlayback();
 }
