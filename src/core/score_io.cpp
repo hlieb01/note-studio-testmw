@@ -22,6 +22,7 @@ constexpr int XmlDivisions = 2048;
 constexpr int MidiPpqn = 9600;
 
 void setError(QString* target, const QString& value) { if (target) *target = value; }
+int intOr(const QString& text, int fallback) { bool ok = false; const int value = text.toInt(&ok); return ok ? value : fallback; }
 
 QJsonObject pitchToJson(const Pitch& pitch) {
     return {{QStringLiteral("step"), static_cast<int>(pitch.step)},
@@ -364,10 +365,10 @@ bool ScoreIO::importMusicXml(Measure& measure, const QString& path, QString* err
             } else if (name == QStringLiteral("alter") && pending) pending->alter = xml.readElementText().toInt();
             else if (name == QStringLiteral("octave") && pending) pending->octave = xml.readElementText().toInt();
             else if (name == QStringLiteral("duration") && pending) pending->ticks = xml.readElementText().toInt();
-            else if (name == QStringLiteral("divisions")) divisions = std::clamp(xml.readElementText().toInt(XmlDivisions), 1, 1000000);
-            else if (name == QStringLiteral("beats")) beats = xml.readElementText().toInt(4);
-            else if (name == QStringLiteral("beat-type")) beatUnit = xml.readElementText().toInt(4);
-            else if (name == QStringLiteral("per-minute")) tempoBpm = xml.readElementText().toInt(120);
+            else if (name == QStringLiteral("divisions")) divisions = std::clamp(intOr(xml.readElementText(), XmlDivisions), 1, 1000000);
+            else if (name == QStringLiteral("beats")) beats = intOr(xml.readElementText(), 4);
+            else if (name == QStringLiteral("beat-type")) beatUnit = intOr(xml.readElementText(), 4);
+            else if (name == QStringLiteral("per-minute")) tempoBpm = intOr(xml.readElementText(), 120);
             else if (name == QStringLiteral("segno")) loaded.segno = true;
             else if (name == QStringLiteral("coda")) loaded.coda = true;
             else if (name == QStringLiteral("wedge")) {
