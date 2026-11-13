@@ -8,7 +8,7 @@
 namespace notestudio::core {
 
 enum class Step : std::uint8_t { C, D, E, F, G, A, B };
-enum class Accidental : std::int8_t { Flat = -1, Natural = 0, Sharp = 1 };
+enum class Accidental : std::int8_t { TripleFlat = -3, DoubleFlat = -2, Flat = -1, Natural = 0, Sharp = 1, DoubleSharp = 2, TripleSharp = 3 };
 
 struct Pitch {
     Step step{Step::C};
@@ -27,8 +27,10 @@ struct Duration {
 };
 
 enum class StemDirection : std::uint8_t { Automatic, Up, Down };
-enum class FermataType : std::uint8_t { Normal, Short, Long, VeryLong };
+enum class FermataType : std::uint8_t { Normal, Short, Long, VeryLong, Triangle, Square };
 enum class Articulation : std::uint8_t { None, Staccato, Accent, Sforzando };
+enum class DynamicMark : std::uint8_t { PPP, PP, P, MP, MF, F, FF, FFF, Niente };
+enum class DynamicWedge : std::uint8_t { None, Crescendo, Diminuendo, CrescendoNiente, DiminuendoNiente };
 
 struct Fermata {
     FermataType type{FermataType::Normal};
@@ -69,6 +71,10 @@ struct Measure {
     RepeatEnd repeatEnd{RepeatEnd::None};
     std::uint8_t repeatCount{2};
     bool coda{false};
+    bool segno{false};
+    std::uint16_t tempoBpm{120};
+    DynamicMark dynamic{DynamicMark::MF};
+    DynamicWedge wedge{DynamicWedge::None};
     std::vector<MeasureEvent> events;
     [[nodiscard]] bool validTimeSignature() const noexcept;
     [[nodiscard]] double capacityInQuarterNotes() const noexcept;

@@ -22,6 +22,8 @@ qt_add_executable(note-studio
     src/main.cpp
     src/core/score.hpp
     src/core/score.cpp
+    src/core/score_io.hpp
+    src/core/score_io.cpp
     src/audio/piano_synth.hpp
     src/audio/piano_synth.cpp
     src/ui/hex_renderer.hpp
@@ -38,7 +40,7 @@ qt_add_qml_module(note-studio
 
 qt_add_resources(note-studio notation_fonts
     PREFIX "/fonts"
-    FILES assets/Bravura.otf assets/OFL.txt
+    FILES assets/Bravura.otf assets/OFL.txt assets/NotoSansCJKJP-subset.otf assets/NotoSansCJK-OFL.txt
 )
 
 target_include_directories(note-studio PRIVATE

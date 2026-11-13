@@ -1,4 +1,5 @@
 #include "score_controller.hpp"
+#include "../core/score_io.hpp"
 
 #include <QMetaObject>
 #include <QTimer>
@@ -20,6 +21,13 @@ int ScoreController::noteCount() const noexcept {
     return static_cast<int>(measure_.events.size());
 }
 
+QString ScoreController::tempoName() const {
+    if (bpm_ < 76.0) return QStringLiteral("Adagio");
+    if (bpm_ < 109.0) return QStringLiteral("Andante");
+    if (bpm_ < 169.0) return QStringLiteral("Allegro");
+    return QStringLiteral("Presto");
+}
+
 QVariantList ScoreController::noteData() const {
     QVariantList result;
     for (const auto& event : measure_.events) {
@@ -27,20 +35,25 @@ QVariantList ScoreController::noteData() const {
         std::visit([&item](const auto& value) {
             using T = std::decay_t<decltype(value)>;
             item.insert(QStringLiteral("denominator"), static_cast<int>(value.duration.denominator));
+            item.insert(QStringLiteral("dots"), static_cast<int>(value.duration.dots));
             item.insert(QStringLiteral("isRest"), std::is_same_v<T, core::Rest>);
             item.insert(QStringLiteral("fermata"), value.fermata.has_value());
             if constexpr (std::is_same_v<T, core::Note>) {
                 item.insert(QStringLiteral("midi"), static_cast<int>(value.pitch.midiNote()));
+                item.insert(QStringLiteral("accidental"), static_cast<int>(value.pitch.accidental));
+                item.insert(QStringLiteral("step"), static_cast<int>(value.pitch.step));
                 item.insert(QStringLiteral("articulation"), static_cast<int>(value.articulation));
                 item.insert(QStringLiteral("tie"), static_cast<qulonglong>(value.tieGroup));
                 item.insert(QStringLiteral("slur"), static_cast<qulonglong>(value.slurGroup));
             } else if constexpr (std::is_same_v<T, core::Chord>) {
                 item.insert(QStringLiteral("midi"), value.pitches.empty() ? 60 : static_cast<int>(value.pitches.front().midiNote()));
+                item.insert(QStringLiteral("accidental"), value.pitches.empty() ? 0 : static_cast<int>(value.pitches.front().accidental));
                 item.insert(QStringLiteral("articulation"), static_cast<int>(value.articulation));
             } else {
                 item.insert(QStringLiteral("midi"), 60);
                 item.insert(QStringLiteral("articulation"), 0);
             }
+            item.insert(QStringLiteral("fermataType"), value.fermata ? static_cast<int>(value.fermata->type) : 0);
         }, event);
         result.push_back(item);
     }
@@ -148,8 +161,14 @@ void ScoreController::playNextEvent() {
         const auto* next = std::get_if<core::Note>(&measure_.events[playbackIndex_]);
         tieContinues = current != nullptr && next != nullptr && next->tieGroup == tieGroup && next->pitch == current->pitch;
     }
+    static constexpr float dynamicVelocity[] = {0.20F, 0.28F, 0.38F, 0.52F, 0.66F, 0.78F, 0.89F, 1.0F, 0.0F};
+    float volume = dynamicVelocity[static_cast<std::size_t>(measure_.dynamic)];
+    const double progress = measure_.events.size() <= 1U ? 1.0 : static_cast<double>(playbackIndex_ - 1U) / static_cast<double>(measure_.events.size() - 1U);
+    if (measure_.wedge == core::DynamicWedge::Crescendo || measure_.wedge == core::DynamicWedge::CrescendoNiente) volume *= static_cast<float>(progress);
+    else if (measure_.wedge == core::DynamicWedge::Diminuendo || measure_.wedge == core::DynamicWedge::DiminuendoNiente) volume *= static_cast<float>(1.0 - progress);
     for (const int midiNote : pitches) {
-        const float velocity = articulation == core::Articulation::Sforzando ? 1.0F : articulation == core::Articulation::Accent ? 0.92F : 0.78F;
+        const float articulationVelocity = articulation == core::Articulation::Sforzando ? 1.0F : articulation == core::Articulation::Accent ? 0.92F : 0.78F;
+        const float velocity = std::clamp(articulationVelocity * volume, 0.0F, 1.0F);
         if (!tiedFromPrevious) {
             synth_.noteOn(static_cast<std::uint8_t>(midiNote), velocity);
             playbackNotes_.push_back(midiNote);
@@ -167,10 +186,10 @@ void ScoreController::scheduleNoteOff(int midiNote, int milliseconds) {
     });
 }
 
-void ScoreController::addNote(int midiNote, int denominator) {
-    if (midiNote < 0 || midiNote > 127 || denominator < 1 || denominator > 512) return;
+void ScoreController::addNote(int midiNote, int denominator, int dots) {
+    if (midiNote < 0 || midiNote > 127 || denominator < 1 || denominator > 1024 || dots < 0 || dots > 3) return;
     const auto validDenominator = static_cast<std::uint16_t>(denominator);
-    core::Duration duration{validDenominator, 0U};
+    core::Duration duration{validDenominator, static_cast<std::uint8_t>(dots)};
     if (!duration.valid()) return;
     const double used = [&]() {
         double sum = 0.0;
@@ -192,9 +211,9 @@ void ScoreController::addNote(int midiNote, int denominator) {
     setMessage(QStringLiteral("Added note · 1/%1").arg(denominator));
 }
 
-void ScoreController::addChord(int midiRoot, int denominator) {
-    if (midiRoot < 0 || midiRoot > 115 || denominator < 1 || denominator > 512) return;
-    const core::Duration duration{static_cast<std::uint16_t>(denominator), 0U};
+void ScoreController::addChord(int midiRoot, int denominator, int dots) {
+    if (midiRoot < 0 || midiRoot > 115 || denominator < 1 || denominator > 1024 || dots < 0 || dots > 3) return;
+    const core::Duration duration{static_cast<std::uint16_t>(denominator), static_cast<std::uint8_t>(dots)};
     if (!duration.valid()) return;
     double used = 0.0;
     for (const auto& event : measure_.events) {
@@ -215,9 +234,9 @@ void ScoreController::addChord(int midiRoot, int denominator) {
     setMessage(QStringLiteral("Added triad chord"));
 }
 
-void ScoreController::addRest(int denominator) {
-    if (denominator < 1 || denominator > 512) return;
-    core::Duration duration{static_cast<std::uint16_t>(denominator), 0U};
+void ScoreController::addRest(int denominator, int dots) {
+    if (denominator < 1 || denominator > 1024 || dots < 0 || dots > 3) return;
+    core::Duration duration{static_cast<std::uint16_t>(denominator), static_cast<std::uint8_t>(dots)};
     if (!duration.valid()) return;
     double used = 0.0;
     for (const auto& event : measure_.events) {
@@ -259,11 +278,14 @@ void ScoreController::setTimeSignature(int numerator, int denominator) {
     setMessage(QStringLiteral("Time signature · %1/%2").arg(numerator).arg(denominator));
 }
 
-void ScoreController::addFermata() {
+void ScoreController::addFermata(int type) {
     if (measure_.events.empty()) return;
-    std::visit([](auto& item) { item.fermata = core::Fermata{}; }, measure_.events.back());
+    if (type < 0 || type > 5) return;
+    static constexpr double factors[] = {1.5, 1.2, 2.0, 3.0, 1.75, 1.5};
+    const core::Fermata fermata{static_cast<core::FermataType>(type), factors[type]};
+    std::visit([fermata](auto& item) { item.fermata = fermata; }, measure_.events.back());
     emit scoreChanged();
-    setMessage(QStringLiteral("Fermata added"));
+    setMessage(QStringLiteral("Fermata variant applied"));
 }
 
 void ScoreController::tieLastTwo() {
@@ -310,6 +332,30 @@ void ScoreController::toggleCoda() {
     setMessage(measure_.coda ? QStringLiteral("Coda marker added") : QStringLiteral("Coda marker removed"));
 }
 
+void ScoreController::toggleSegno() {
+    measure_.segno = !measure_.segno;
+    emit scoreChanged();
+    setMessage(measure_.segno ? QStringLiteral("Segno marker added") : QStringLiteral("Segno marker removed"));
+}
+
+void ScoreController::setTempoBpm(int bpm) {
+    if (bpm < 20 || bpm > 300 || measure_.tempoBpm == static_cast<std::uint16_t>(bpm)) return;
+    measure_.tempoBpm = static_cast<std::uint16_t>(bpm);
+    bpm_ = static_cast<double>(bpm);
+    emit tempoChanged();
+    emit scoreChanged();
+    setMessage(QStringLiteral("%1 · %2 BPM").arg(tempoName()).arg(bpm));
+}
+
+void ScoreController::setDynamics(int mark, int wedge) {
+    if (mark < 0 || mark > static_cast<int>(core::DynamicMark::Niente) ||
+        wedge < 0 || wedge > static_cast<int>(core::DynamicWedge::DiminuendoNiente)) return;
+    measure_.dynamic = static_cast<core::DynamicMark>(mark);
+    measure_.wedge = static_cast<core::DynamicWedge>(wedge);
+    emit scoreChanged();
+    setMessage(QStringLiteral("Dynamics updated"));
+}
+
 void ScoreController::setLastArticulation(const QString& name) {
     if (measure_.events.empty()) return;
     core::Articulation articulation = core::Articulation::None;
@@ -324,10 +370,62 @@ void ScoreController::setLastArticulation(const QString& name) {
     setMessage(QStringLiteral("Articulation updated"));
 }
 
+void ScoreController::saveProjectJson(const QString& path) {
+    QString error;
+    if (core::ScoreIO::saveJson(measure_, path, &error)) setMessage(QStringLiteral("Project saved: %1").arg(path));
+    else setMessage(QStringLiteral("Save failed: %1").arg(error));
+}
+
+void ScoreController::loadProjectJson(const QString& path) {
+    core::Measure loaded;
+    QString error;
+    if (!core::ScoreIO::loadJson(loaded, path, &error)) { setMessage(QStringLiteral("Open failed: %1").arg(error)); return; }
+    stopPlayback();
+    measure_ = std::move(loaded);
+    bpm_ = static_cast<double>(measure_.tempoBpm);
+    emit meterChanged();
+    emit scoreChanged();
+    emit tempoChanged();
+    setMessage(QStringLiteral("Project opened: %1").arg(path));
+}
+
+void ScoreController::exportMusicXml(const QString& path) {
+    QString error;
+    if (core::ScoreIO::exportMusicXml(measure_, path, &error)) setMessage(QStringLiteral("MusicXML exported"));
+    else setMessage(QStringLiteral("MusicXML export failed: %1").arg(error));
+}
+
+void ScoreController::importMusicXml(const QString& path) {
+    core::Measure loaded;
+    QString error;
+    if (!core::ScoreIO::importMusicXml(loaded, path, &error)) { setMessage(QStringLiteral("MusicXML import failed: %1").arg(error)); return; }
+    stopPlayback();
+    measure_ = std::move(loaded);
+    bpm_ = static_cast<double>(measure_.tempoBpm);
+    emit meterChanged();
+    emit scoreChanged();
+    emit tempoChanged();
+    setMessage(QStringLiteral("MusicXML imported"));
+}
+
+void ScoreController::exportMidi(const QString& path) {
+    QString error;
+    if (core::ScoreIO::exportMidi(measure_, path, static_cast<int>(bpm_), &error)) setMessage(QStringLiteral("MIDI exported"));
+    else setMessage(QStringLiteral("MIDI export failed: %1").arg(error));
+}
+
 void ScoreController::setHexMode(bool enabled) {
-    if (hexMode_ == enabled) return;
-    hexMode_ = enabled;
-    emit hexModeChanged();
+    setNotationMode(enabled ? 1 : 0);
+}
+
+void ScoreController::setNotationMode(int mode) {
+    const int bounded = std::clamp(mode, 0, 3);
+    if (notationMode_ == bounded) return;
+    const bool wasHex = hexMode_;
+    notationMode_ = bounded;
+    hexMode_ = bounded == 1;
+    emit notationModeChanged();
+    if (wasHex != hexMode_) emit hexModeChanged();
 }
 
 void ScoreController::setMessage(const QString& value) {

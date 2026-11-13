@@ -18,6 +18,7 @@ constexpr ushort SmuflGClef = 0xE050U;
 constexpr ushort SmuflFClef = 0xE062U;
 constexpr ushort SmuflFermata = 0xE4C0U;
 constexpr ushort SmuflCoda = 0xE048U;
+constexpr ushort SmuflSegno = 0xE047U;
 constexpr ushort SmuflNoteheadWhole = 0xE0A2U;
 constexpr ushort SmuflNoteheadHalf = 0xE0A3U;
 constexpr ushort SmuflNoteheadBlack = 0xE0A4U;
@@ -35,9 +36,17 @@ HexRenderer::HexRenderer(QQuickItem* parent) : QQuickPaintedItem(parent) {
 }
 
 void HexRenderer::setHexMode(bool enabled) {
-    if (hexMode_ == enabled) return;
-    hexMode_ = enabled;
-    emit hexModeChanged();
+    setNotationMode(enabled ? 1 : 0);
+}
+
+void HexRenderer::setNotationMode(int mode) {
+    const int bounded = std::clamp(mode, 0, 3);
+    if (notationMode_ == bounded) return;
+    const bool wasHex = hexMode_;
+    notationMode_ = bounded;
+    hexMode_ = bounded == 1;
+    emit notationModeChanged();
+    if (wasHex != hexMode_) emit hexModeChanged();
     update();
 }
 
@@ -62,6 +71,34 @@ void HexRenderer::setCoda(bool value) {
     update();
 }
 
+void HexRenderer::setSegno(bool value) {
+    if (segno_ == value) return;
+    segno_ = value;
+    emit notationChanged();
+    update();
+}
+
+void HexRenderer::setTempoBpm(int value) {
+    if (tempoBpm_ == value) return;
+    tempoBpm_ = value;
+    emit notationChanged();
+    update();
+}
+
+void HexRenderer::setDynamicMark(int value) {
+    if (dynamicMark_ == value) return;
+    dynamicMark_ = std::clamp(value, 0, 8);
+    emit notationChanged();
+    update();
+}
+
+void HexRenderer::setDynamicWedge(int value) {
+    if (dynamicWedge_ == value) return;
+    dynamicWedge_ = std::clamp(value, 0, 4);
+    emit notationChanged();
+    update();
+}
+
 void HexRenderer::setNotes(const QVariantList& value) {
     notes_ = value;
     emit notationChanged();
@@ -72,7 +109,66 @@ void HexRenderer::paint(QPainter* painter) {
     if (painter == nullptr || width() <= 0.0 || height() <= 0.0) return;
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->fillRect(boundingRect(), QColor(QStringLiteral("#081d2b")));
-    hexMode_ ? paintHex(painter) : paintStaff(painter);
+    if (notationMode_ == 1) paintHex(painter);
+    else if (notationMode_ == 2) paintJianpu(painter, false);
+    else if (notationMode_ == 3) paintJianpu(painter, true);
+    else paintStaff(painter);
+}
+
+void HexRenderer::paintJianpu(QPainter* painter, bool kanji) {
+    const QColor ink(QStringLiteral("#d9f7fa"));
+    const qreal baseline = height() * 0.53;
+    painter->setPen(QPen(QColor(QStringLiteral("#355a6c")), 1.0));
+    painter->drawLine(QPointF(width() * 0.07, baseline), QPointF(width() * 0.94, baseline));
+    QFont font(kanji ? QStringLiteral("Noto Sans CJK JP") : QStringLiteral("Inter"));
+    font.setPixelSize(static_cast<int>(std::clamp(height() * 0.18, 28.0, 78.0)));
+    painter->setFont(font);
+    painter->setPen(ink);
+    static const QStringList jianpu{QStringLiteral("壱"), QStringLiteral("弐"), QStringLiteral("参"), QStringLiteral("四"),
+                                    QStringLiteral("五"), QStringLiteral("六"), QStringLiteral("七")};
+    if (notes_.isEmpty()) {
+        painter->setFont(QFont(QStringLiteral("Inter"), 14));
+        painter->setPen(QColor(QStringLiteral("#68899a")));
+        painter->drawText(boundingRect(), Qt::AlignCenter, QStringLiteral("Choose a note below to begin"));
+        return;
+    }
+    const qreal left = width() * 0.12;
+    const qreal usableWidth = width() * 0.78;
+    const qreal gap = usableWidth / static_cast<qreal>(std::max<qsizetype>(1, notes_.size()));
+    for (qsizetype index = 0; index < notes_.size(); ++index) {
+        const QVariantMap event = notes_.at(index).toMap();
+        const bool isRest = event.value(QStringLiteral("isRest")).toBool();
+        const int midi = event.value(QStringLiteral("midi"), 60).toInt();
+        const int semitone = ((midi % 12) + 12) % 12;
+        static constexpr int degrees[] = {0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6};
+        const int degree = degrees[semitone];
+        const qreal x = left + (static_cast<qreal>(index) + 0.5) * gap;
+        QString label = isRest ? QStringLiteral("0") : kanji ? jianpu.at(degree) : QString::number(degree + 1);
+        if (!isRest) {
+            const int octave = midi / 12 - 5;
+            const int dotCount = std::min(2, std::abs(octave));
+            for (int dot = 0; dot < dotCount; ++dot) {
+                const qreal dotY = baseline + (octave > 0 ? -font.pixelSize() * 0.65 : font.pixelSize() * 0.45);
+                painter->setBrush(ink);
+                painter->setPen(Qt::NoPen);
+                painter->drawEllipse(QPointF(x + (static_cast<qreal>(dot) - 0.5) * font.pixelSize() * 0.25, dotY), 2.2, 2.2);
+            }
+        }
+        painter->setPen(ink);
+        painter->drawText(QRectF(x - gap * 0.45, baseline - font.pixelSize(), gap * 0.9, font.pixelSize() * 1.3), Qt::AlignCenter, label);
+        const int denominator = event.value(QStringLiteral("denominator"), 4).toInt();
+        const int dots = event.value(QStringLiteral("dots"), 0).toInt();
+        if (denominator > 4) {
+            painter->setFont(QFont(QStringLiteral("Inter"), 10));
+            painter->drawText(QPointF(x + font.pixelSize() * 0.35, baseline + font.pixelSize() * 0.25), QString::number(denominator));
+            painter->setFont(font);
+        }
+        for (int dot = 0; dot < dots; ++dot) painter->drawEllipse(QPointF(x + font.pixelSize() * 0.32 + dot * 6.0, baseline - 3.0), 2.0, 2.0);
+    }
+    if (coda_) {
+        painter->setFont(QFont(QStringLiteral("Bravura"), 30));
+        painter->drawText(QPointF(width() * 0.92, height() * 0.12), QString(glyph(SmuflCoda)));
+    }
 }
 
 void HexRenderer::paintStaff(QPainter* painter) {
@@ -100,6 +196,9 @@ void HexRenderer::paintStaff(QPainter* painter) {
     painter->drawText(QPointF(left + staffSpace * 0.15, top + staffSpace * 11.0), QString(glyph(SmuflFClef)));
     painter->setFont(QFont(QStringLiteral("Inter"), static_cast<int>(std::lround(staffSpace * 0.9)), QFont::DemiBold));
     painter->drawText(QPointF(left + staffSpace * 3.2, top + staffSpace * 1.6), QStringLiteral("%1/%2").arg(beats_).arg(beatUnit_));
+    painter->drawText(QPointF(left + staffSpace * 3.2, top - staffSpace * 0.2), QStringLiteral("♩ = %1").arg(tempoBpm_));
+    static const QString dynamics[] = {QStringLiteral("ppp"),QStringLiteral("pp"),QStringLiteral("p"),QStringLiteral("mp"),QStringLiteral("mf"),QStringLiteral("f"),QStringLiteral("ff"),QStringLiteral("fff"),QStringLiteral("n")};
+    painter->drawText(QPointF(right - staffSpace * 4.0, top - staffSpace * 0.2), dynamics[static_cast<std::size_t>(std::clamp(dynamicMark_, 0, 8))]);
     painter->setPen(QPen(QColor(QStringLiteral("#355a6c")), 1.0));
     painter->drawLine(QPointF(left + staffSpace * 5.5, top - staffSpace), QPointF(left + staffSpace * 5.5, top + staffSpace * 5.0));
 
@@ -115,6 +214,9 @@ void HexRenderer::paintStaff(QPainter* painter) {
         const bool isRest = note.value(QStringLiteral("isRest"), false).toBool();
         const int midi = note.value(QStringLiteral("midi"), 60).toInt();
         const bool fermata = note.value(QStringLiteral("fermata"), false).toBool();
+        const int fermataType = note.value(QStringLiteral("fermataType"), 0).toInt();
+        const int accidental = note.value(QStringLiteral("accidental"), 0).toInt();
+        const int dots = note.value(QStringLiteral("dots"), 0).toInt();
         const int articulation = note.value(QStringLiteral("articulation"), 0).toInt();
         const ushort noteGlyph = denominator <= 1 ? SmuflNoteheadWhole : denominator <= 2 ? SmuflNoteheadHalf : SmuflNoteheadBlack;
         const ushort restGlyph = denominator <= 1 ? SmuflRestWhole : denominator <= 2 ? SmuflRestHalf : denominator <= 4 ? SmuflRestQuarter : SmuflRest8th;
@@ -132,11 +234,32 @@ void HexRenderer::paintStaff(QPainter* painter) {
             }
         }
         painter->setPen(ink);
+        if (!isRest && accidental != 0) {
+            const ushort accidentalGlyph = accidental == -1 ? 0xE260U : accidental == 1 ? 0xE262U :
+                accidental == -2 ? 0xE264U : accidental == 2 ? 0xE263U : accidental < 0 ? 0xE264U : 0xE263U;
+            const int repetitions = std::abs(accidental) == 3 ? 2 : 1;
+            for (int sign = 0; sign < repetitions; ++sign) {
+                const qreal accidentalX = x - staffSpace * (1.25 + static_cast<qreal>(sign) * 0.48);
+                const ushort glyphCode = repetitions == 2 && sign == 1 ? (accidental < 0 ? 0xE260U : 0xE262U) : accidentalGlyph;
+                painter->drawText(QPointF(accidentalX, baseline), QString(glyph(glyphCode)));
+            }
+        }
         painter->drawText(QPointF(x - staffSpace * 0.55, baseline), QString(glyph(isRest ? restGlyph : noteGlyph)));
+        for (int dot = 0; dot < dots; ++dot) {
+            painter->setBrush(ink);
+            painter->setPen(Qt::NoPen);
+            painter->drawEllipse(QPointF(x + staffSpace * (0.55 + static_cast<qreal>(dot) * 0.24), baseline - staffSpace * 0.22), 1.8, 1.8);
+            painter->setPen(ink);
+        }
         if (denominator >= 8 && !isRest) {
             painter->drawText(QPointF(x + staffSpace * 0.42, baseline - staffSpace), QString(glyph(0xE240U)));
         }
-        if (fermata) painter->drawText(QPointF(x - staffSpace * 0.5, baseline - staffSpace * 1.55), QString(glyph(SmuflFermata)));
+        if (fermata && fermataType == 4) {
+            QPolygonF triangle; triangle << QPointF(x, baseline - staffSpace * 2.0) << QPointF(x - staffSpace * 0.35, baseline - staffSpace * 1.45) << QPointF(x + staffSpace * 0.35, baseline - staffSpace * 1.45);
+            painter->setBrush(ink); painter->setPen(QPen(ink, 1.0)); painter->drawPolygon(triangle);
+        } else if (fermata && fermataType == 5) {
+            painter->setBrush(Qt::NoBrush); painter->setPen(QPen(ink, 1.5)); painter->drawRect(QRectF(x - staffSpace * 0.28, baseline - staffSpace * 1.9, staffSpace * 0.56, staffSpace * 0.56));
+        } else if (fermata) painter->drawText(QPointF(x - staffSpace * 0.5, baseline - staffSpace * 1.55), QString(glyph(SmuflFermata)));
         if (articulation == 1) painter->drawText(QPointF(x - staffSpace * 0.25, baseline - staffSpace), QString(glyph(0xE4A2U)));
         if (articulation == 2 || articulation == 3) painter->drawText(QPointF(x - staffSpace * 0.25, baseline - staffSpace), QStringLiteral(">"));
         if (index + 1 < notes_.size() && !isRest) {
@@ -167,6 +290,22 @@ void HexRenderer::paintStaff(QPainter* painter) {
     if (coda_) {
         painter->drawText(QPointF(right - staffSpace * 1.2, top + staffSpace * 1.3), QString(glyph(SmuflCoda)));
     }
+    if (segno_) painter->drawText(QPointF(right - staffSpace * 3.0, top + staffSpace * 1.3), QString(glyph(SmuflSegno)));
+    if (dynamicWedge_ != 0) {
+        const qreal x1 = left + staffSpace * 7.0; const qreal x2 = right - staffSpace * 2.0;
+        const qreal midY = top + staffSpace * 13.2; const qreal spread = staffSpace * 0.5;
+        const bool crescendo = dynamicWedge_ == 1 || dynamicWedge_ == 3;
+        const qreal firstSpread = crescendo ? 0.0 : spread;
+        const qreal lastSpread = crescendo ? spread : 0.0;
+        painter->setPen(QPen(ink, 1.2));
+        painter->drawLine(QPointF(x1, midY - firstSpread), QPointF(x2, midY - lastSpread));
+        painter->drawLine(QPointF(x1, midY + firstSpread), QPointF(x2, midY + lastSpread));
+        if (dynamicWedge_ == 3 || dynamicWedge_ == 4) {
+            const qreal ringX = dynamicWedge_ == 3 ? x1 : x2;
+            painter->setBrush(Qt::NoBrush);
+            painter->drawEllipse(QPointF(ringX, midY), staffSpace * 0.16, staffSpace * 0.16);
+        }
+    }
 }
 
 void HexRenderer::paintHex(QPainter* painter) {
@@ -191,12 +330,22 @@ void HexRenderer::paintHex(QPainter* painter) {
         const qreal y = height() * 0.25 + static_cast<qreal>(line) * height() * 0.075;
         painter->drawLine(QPointF(width() * 0.16, y), QPointF(width() * 0.84, y));
     }
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(QColor(QStringLiteral("#b9fff5")));
+    painter->setPen(QPen(QColor(QStringLiteral("#b9fff5")), 1.5));
     for (qsizetype index = 0; index < notes_.size(); ++index) {
-        const qreal angle = static_cast<qreal>(index) * 0.55;
-        const qreal radius = static_cast<qreal>(maxRadius) * 0.38;
-        painter->drawEllipse(QPointF(center.x() + std::cos(angle) * radius, center.y() + std::sin(angle) * radius), 5.5, 4.0);
+        const QVariantMap event = notes_.at(index).toMap();
+        if (event.value(QStringLiteral("isRest")).toBool()) continue;
+        const int midi = event.value(QStringLiteral("midi"), 60).toInt();
+        const double angle = static_cast<double>((midi % 12 + 12) % 12) * Pi / 6.0 - Pi / 2.0;
+        const double octave = static_cast<double>(std::clamp(midi / 12 - 1, 0, 8));
+        const double radius = maxRadius * (0.12 + octave * 0.075);
+        const QPointF point(center.x() + std::cos(angle) * radius, center.y() + std::sin(angle) * radius);
+        const double dotRadius = 3.0 + std::min(4, event.value(QStringLiteral("denominator"), 4).toInt() / 16);
+        painter->setBrush(QColor(QStringLiteral("#b9fff5")));
+        painter->drawEllipse(point, dotRadius, dotRadius);
+        painter->setFont(QFont(QStringLiteral("Inter"), 8));
+        painter->setPen(QColor(QStringLiteral("#061724")));
+        painter->drawText(QRectF(point.x() - 14, point.y() + dotRadius + 1, 28, 12), Qt::AlignCenter, QString::number(midi));
+        painter->setPen(QPen(QColor(QStringLiteral("#b9fff5")), 1.5));
     }
 }
 

@@ -28,7 +28,7 @@ double Duration::quarterNotes() const noexcept {
 }
 
 bool Duration::valid() const noexcept {
-    return denominator >= 1U && denominator <= 512U && std::has_single_bit(denominator) && dots <= 3U;
+    return denominator >= 1U && denominator <= 1024U && std::has_single_bit(denominator) && dots <= 3U;
 }
 
 bool Measure::validTimeSignature() const noexcept {

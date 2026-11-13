@@ -18,8 +18,16 @@ cmake --build build --config Release
 
 For Android, configure with the Qt-provided Android toolchain and SDK/NDK settings, for example via Qt Creator or the official Qt Android CMake preset/toolchain. For Windows, use a Visual Studio generator and a Qt MSVC kit matching the selected architecture.
 
-## Current starter scope
+## Editor capabilities
 
-The model supports notes, rests, chords, dotted durations through 1/512, arbitrary power-of-two beat units, fermatas, ties, slurs, articulations, repeat markers and coda metadata. The editor schedules the current measure at 120 BPM and sends note-on/note-off commands to miniaudio. The first chord control inserts a major triad. The renderer draws a treble/bass grand staff by default and has an optional hexagonal easter-egg mode.
+The editor supports durations from whole notes through 1/1024 with up to three dots; notes, triads, rests, ties, slurs, articulations, fermata variants, repeats, coda/segno markers, tempo, dynamic marks, crescendo/diminuendo, and niente wedges. Playback uses the 64-voice miniaudio piano synthesizer. Render modes include the grand staff, a pitch/octave honeycomb, Jianpu digits, and Japanese kanji. Bravura and a subsetted Noto Sans CJK JP font are bundled with their license notices.
 
-Bravura is the SMuFL reference font and is distributed under the SIL Open Font License; the license text is included at `assets/OFL.txt`.
+The File menu supports versioned JSON project save/load, MusicXML import/export, and Standard MIDI File export. The current editor owns one measure, so file import/export is intentionally bounded to a single part and measure; it does not claim full multi-part or multi-measure score editing. MusicXML constructs outside the editor model may be simplified or rejected.
+
+## Android APK signing
+
+The Android workflow signs and verifies the APK before uploading the `note-studio-android-arm64-signed` artifact. Configure repository Actions secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` to use a persistent signing identity suitable for releases and upgrades. If these secrets are absent, CI generates a temporary debug key for an installable test artifact; that fallback is not a stable release identity, so APKs signed by different runs will not update one another in place.
+
+## Font licenses
+
+Bravura is distributed under the SIL Open Font License; see `assets/OFL.txt`. The bundled Noto Sans CJK JP subset and its notice are in `assets/NotoSansCJKJP-subset.otf` and `assets/NotoSansCJK-OFL.txt`.

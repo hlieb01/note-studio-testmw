@@ -11,6 +11,7 @@ int main(int argc, char* argv[]) {
     QGuiApplication app(argc, argv);
     qmlRegisterType<notestudio::ui::HexRenderer>("NoteStudio", 1, 0, "HexRenderer");
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/assets/Bravura.otf"));
+    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/assets/NotoSansCJKJP-subset.otf"));
     notestudio::ui::ScoreController score;
     score.initializeAudio();
     QQmlApplicationEngine engine;

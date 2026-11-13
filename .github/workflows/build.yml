@@ -89,10 +89,46 @@ jobs:
       - name: Build
         run: cmake --build build-android --parallel
 
-      - name: Upload Android artifact
+      - name: Sign Android APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          unsigned_apk="build-android/android-build/build/outputs/apk/release/android-build-release-unsigned.apk"
+          signed_apk="build-android/android-build/build/outputs/apk/release/note-studio-android-arm64-signed.apk"
+          keystore="$RUNNER_TEMP/note-studio-signing.jks"
+          test -f "$unsigned_apk"
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            key_alias="$ANDROID_KEY_ALIAS"
+            store_password="$ANDROID_KEYSTORE_PASSWORD"
+            key_password="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          else
+            echo "ANDROID_KEYSTORE_BASE64 is not configured; generating a temporary debug signing key for this CI artifact. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEY_ALIAS, ANDROID_KEYSTORE_PASSWORD, and ANDROID_KEY_PASSWORD for stable release signing."
+            key_alias="androiddebugkey"
+            store_password="android"
+            key_password="android"
+            keytool -genkeypair -noprompt -keystore "$keystore" -storepass "$store_password" -keypass "$key_password" \
+              -alias "$key_alias" -dname "CN=Note Studio CI,O=Note Studio,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          apksigner="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$apksigner" sign --ks "$keystore" --ks-key-alias "$key_alias" \
+            --ks-pass "pass:$store_password" --key-pass "pass:$key_password" \
+            --out "$signed_apk" "$unsigned_apk"
+          "$apksigner" verify --verbose "$signed_apk"
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/note-studio-signing.jks"
+
+      - name: Upload signed Android artifact
         uses: actions/upload-artifact@v4
         with:
-          name: note-studio-android-arm64
-          path: build-android/android-build/build/outputs/apk/release/android-build-release-unsigned.apk
+          name: note-studio-android-arm64-signed
+          path: build-android/android-build/build/outputs/apk/release/note-studio-android-arm64-signed.apk
           if-no-files-found: error
           retention-days: 14
